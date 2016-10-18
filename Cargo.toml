@@ -5,3 +5,4 @@ authors = ["acarl123 <chuckles.theman@gmail.com>"]
 
 [dependencies]
 simple_csv = "~0.0.8"
+chrono = "0.2"
