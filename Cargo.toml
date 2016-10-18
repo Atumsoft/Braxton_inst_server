@@ -1,0 +1,7 @@
+[package]
+name = "inst_csv_server"
+version = "0.1.0"
+authors = ["acarl123 <chuckles.theman@gmail.com>"]
+
+[dependencies]
+simple_csv = "~0.0.8"
