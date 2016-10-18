@@ -1,4 +1,4 @@
-mod UDPServer;
+pub mod udp_server;
 
 use std::io;
 use std::io::prelude::*;
@@ -19,30 +19,30 @@ fn read_file(path_to_file: &str)-> Result<String, io::Error> {
 
 // struct that holds info for the columns in the parsed file
 #[derive(Debug)]
-struct csv_rows {
-    Date: String,
-    Time: String,
-    Info: HashMap<String, String>
+struct CsvRows {
+    date: String,
+    time: String,
+    info: HashMap<String, String>
 }
 
 
-fn parse_csv(file_str: String, lines_to_skip: usize) -> Vec<csv_rows> {
+fn parse_csv(file_str: String, lines_to_skip: usize) -> Vec<CsvRows> {
     // setup csv reader
     let bytes = file_str.into_bytes();
     let csv_reader = &*bytes;
 
     let mut csv_options: SimpleCsvReaderOptions = Default::default();
     csv_options.delimiter = ';';
-    let mut reader = SimpleCsvReader::new(csv_reader);
+    let reader = SimpleCsvReader::new(csv_reader);
 
     // setup vars
     let header_line_index = lines_to_skip + 1;
     let mut header_strings: Vec<String> = Vec::new();
-    let mut csv_details = Vec::<csv_rows>::new();
+    let mut csv_details = Vec::<CsvRows>::new();
 
     for (i, row) in reader.enumerate() {
         let mut csv_info = HashMap::<String, String>::new();
-        let mut row_info = csv_rows{Date : "".to_string(), Time: "".to_string(), Info: HashMap::<String, String>::new()};
+        let mut row_info = CsvRows {date : "".to_string(), time: "".to_string(), info: HashMap::<String, String>::new()};
 
         // need to skip lines for header info depending on instrument
         if i <= lines_to_skip {
@@ -70,10 +70,10 @@ fn parse_csv(file_str: String, lines_to_skip: usize) -> Vec<csv_rows> {
             }
             else {
                 if x == 0 { //date
-                    row_info.Date = cell.clone();
+                    row_info.date = cell.clone();
                 }
                 else if x == 1 { //time
-                    row_info.Time = cell.clone();
+                    row_info.time = cell.clone();
                 }
                 else if x == 2 { // this is the test number if ever needed
 //                    println!("Test number {}", cell);
@@ -83,9 +83,9 @@ fn parse_csv(file_str: String, lines_to_skip: usize) -> Vec<csv_rows> {
                 }
             }
         }
-        if row_info.Date != "" { // need to skip the first iteration where header info is built
+        if row_info.date != "" { // need to skip the first iteration where header info is built
             // run info
-            row_info.Info = csv_info;
+            row_info.info = csv_info;
 
             // populate vec with updated info
             csv_details.push(row_info);
@@ -108,5 +108,5 @@ fn main() {
         println!("{:?}", test);
     }
 
-    UDPServer::socket_response("0.0.0.0", 13389);
+    udp_server::socket_response("0.0.0.0", 13389);
 }
