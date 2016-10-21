@@ -12,6 +12,7 @@ use std::cmp::Ordering;
 
 use simple_csv::*;
 use chrono::*;
+use rustc_serialize::json;
 
 
 fn int_to_char(byte_array: &[u8; 255]) -> String{
@@ -110,7 +111,7 @@ pub fn socket_response(listen_addr: &str, listen_port: i32, lines_to_skip: usize
             for test in &csv_details {
                 let time_in_range = time_compare(&start_date, &end_date, &test.date);
                 if time_in_range {
-                    let row_data = format!("{:?}", test);
+                    let row_data = json::encode(&test).unwrap();
                     try!(socket.send_to(row_data.as_bytes(), src));
                 }
             }

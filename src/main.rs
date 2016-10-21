@@ -3,6 +3,7 @@ pub mod data_structs;
 
 extern crate simple_csv;
 extern crate chrono;
+extern crate rustc_serialize;
 
 
 fn main() {

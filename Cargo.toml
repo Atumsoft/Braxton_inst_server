@@ -4,5 +4,6 @@ version = "0.1.0"
 authors = ["acarl123 <chuckles.theman@gmail.com>"]
 
 [dependencies]
-simple_csv = "~0.0.8"
+csv = "0.14.7"
 chrono = "0.2"
+rustc-serialize = "0.3"
