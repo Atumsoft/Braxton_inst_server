@@ -6,4 +6,4 @@ authors = ["acarl123 <chuckles.theman@gmail.com>"]
 [dependencies]
 csv = "0.14.7"
 chrono = "0.2"
-rustc-serialize = "0.3"
+byteorder = "0.5.3"

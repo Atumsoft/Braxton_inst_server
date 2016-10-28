@@ -10,9 +10,9 @@ use std::fs;
 use std::env;
 use std::cmp::Ordering;
 
-use simple_csv::*;
+use csv;
+use byteorder::{ByteOrder, LittleEndian};
 use chrono::*;
-use rustc_serialize::json;
 
 
 fn int_to_char(byte_array: &[u8; 255]) -> String{
@@ -99,24 +99,34 @@ pub fn socket_response(listen_addr: &str, listen_port: i32, lines_to_skip: usize
             let mut buf = [0; 255];
             let (amt, src) = try!(socket.recv_from(&mut buf));
             let date_range = int_to_char(&buf);
-            // CSV parsing
-            let file_str = read_file(path_to_csv).unwrap(); //TODO: should do a match
-            let csv_details = parse_csv(file_str, lines_to_skip);
 
             // remove undesired dates
             let split: Vec<&str> = date_range.split("-").collect();
             let start_date = split[0];
             let end_date = split[1];
 
-            for test in &csv_details {
-                let time_in_range = time_compare(&start_date, &end_date, &test.date);
-                if time_in_range {
-                    let row_data = json::encode(&test).unwrap();
-                    try!(socket.send_to(row_data.as_bytes(), src));
+            // CSV parsing
+            let file_str = read_file(path_to_csv).unwrap(); //TODO: should do a match
+            let mut csv_file = parse_csv(file_str, lines_to_skip, start_date, end_date);
+
+            let mut send_buf = [0;255];
+            let mut size: u32 = csv_file.len() as u32;
+            LittleEndian::write_u32(&mut send_buf, size);
+
+            try!(socket.send_to(&send_buf, src));
+
+            while !csv_file.is_empty() {
+                let mut len_of_message = csv_file.len();
+                if len_of_message >= 255{
+                    len_of_message = 255
                 }
+
+                let mut send_buf: Vec<u8> = csv_file.drain(0..len_of_message).collect();
+                try!(socket.send_to(&send_buf, src));
             }
 
-            try!(socket.send_to(b"STOP", src));
+//            FOR EMERGENCIES ONLY
+//            try!(socket.send_to(b"STOP", src));
         }
     }
     Ok(())
@@ -154,21 +164,17 @@ fn read_file(path_to_file: &str)-> Result<String, io::Error> {
 }
 
 
-fn parse_csv(file_str: String, lines_to_skip: usize) -> Vec<CsvRows> {
-    // setup csv reader
-    let bytes = file_str.into_bytes();
-    let csv_reader = &*bytes;
+fn parse_csv(file_str: String, lines_to_skip: usize, start_date: &str, end_date: &str) -> Vec<u8> {
 
-    let mut csv_options: SimpleCsvReaderOptions = Default::default();
-    csv_options.delimiter = ';';
-    let reader = SimpleCsvReader::new(csv_reader);
+    let mut reader = csv::Reader::from_string(file_str).delimiter(b';').flexible(true);
+    let mut writer = csv::Writer::from_memory();
 
     // setup vars
     let header_line_index = lines_to_skip + 1;
     let mut header_strings: Vec<String> = Vec::new();
-    let mut csv_details = Vec::<CsvRows>::new();
 
-    for (i, row) in reader.enumerate() {
+    for (i, row) in reader.decode().enumerate() {
+        let mut csv_details = Vec::new();
         let mut csv_info = HashMap::<String, String>::new();
         let mut row_info = CsvRows {date : "".to_string(), time: "".to_string(), info: HashMap::<String, String>::new()};
 
@@ -182,10 +188,10 @@ fn parse_csv(file_str: String, lines_to_skip: usize) -> Vec<CsvRows> {
             continue;
         }
 
-        let ref mut row_vec = row.unwrap()[0];
+        let mut row_vec: Vec<String> = row.unwrap();
 
         // we get all rows, so we need to split into individual cells here
-        for (x, item) in row_vec.split(";").enumerate() {
+        for (x, item) in row_vec.iter().enumerate() {
 
             let cell = str::replace(item, "\u{0}", ""); // a lot of weird data here
             if cell == "" {
@@ -194,31 +200,41 @@ fn parse_csv(file_str: String, lines_to_skip: usize) -> Vec<CsvRows> {
 
             // construct header information
             if i == header_line_index {
-                header_strings.push(cell.clone());
+                csv_details.push(cell.clone());
             }
-                else {
-                    if x == 0 { //date
-                        row_info.date = cell.clone();
-                    }
-                        else if x == 1 { //time
-                            row_info.time = cell.clone();
-                        }
-                            else if x == 2 { // this is the test number if ever needed
-                                //                    println!("Test number {}", cell);
-                            }
-                                else { //other info
-                                    csv_info.insert(header_strings[x-3].clone(), cell);
-                                }
+            else {
+                if x == 0 { //date
+                    let date_in_range = time_compare(&start_date, &end_date, &cell);
+                    if !date_in_range{continue;}
+                    csv_details.push(cell.clone());
+                    row_info.date = cell.clone();
                 }
+                    else if x == 1 { //time
+                        csv_details.push(cell.clone());
+                        row_info.time = cell.clone();
+                    }
+                        else if x == 2 { // this is the test number if ever needed
+                            //                    println!("Test number {}", cell);
+                        }
+                            else { //other info
+                                csv_details.push(cell.clone());
+//                                csv_info.insert(header_strings[x-3].clone(), cell);
+                            }
+            }
         }
         if row_info.date != "" { // need to skip the first iteration where header info is built
             // run info
             row_info.info = csv_info;
 
             // populate vec with updated info
-            csv_details.push(row_info);
+            writer.encode(csv_details);
+        }
+        else{
+            let mut date_header = vec!("Date".to_string(), "Time".to_string());
+            date_header.append(&mut csv_details);
+            writer.encode(date_header);
         }
     }
 
-    csv_details
+    writer.as_bytes().to_vec()
 }
