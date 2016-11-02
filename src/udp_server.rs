@@ -173,7 +173,7 @@ fn parse_csv(file_str: String, lines_to_skip: usize, start_date: &str, end_date:
     let header_line_index = lines_to_skip + 1;
     let mut header_strings: Vec<String> = Vec::new();
 
-    for (i, row) in reader.decode().enumerate() {
+    'rows: for (i, row) in reader.decode().enumerate() {
         let mut csv_details = Vec::new();
         let mut csv_info = HashMap::<String, String>::new();
         let mut row_info = CsvRows {date : "".to_string(), time: "".to_string(), info: HashMap::<String, String>::new()};
@@ -191,7 +191,7 @@ fn parse_csv(file_str: String, lines_to_skip: usize, start_date: &str, end_date:
         let mut row_vec: Vec<String> = row.unwrap();
 
         // we get all rows, so we need to split into individual cells here
-        for (x, item) in row_vec.iter().enumerate() {
+        'cells: for (x, item) in row_vec.iter().enumerate() {
 
             let cell = str::replace(item, "\u{0}", ""); // a lot of weird data here
             if cell == "" {
@@ -205,7 +205,7 @@ fn parse_csv(file_str: String, lines_to_skip: usize, start_date: &str, end_date:
             else {
                 if x == 0 { //date
                     let date_in_range = time_compare(&start_date, &end_date, &cell);
-                    if !date_in_range{continue;}
+                    if !date_in_range{continue 'rows;}
                     csv_details.push(cell.clone());
                     row_info.date = cell.clone();
                 }
